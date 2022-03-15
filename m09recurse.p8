@@ -2,165 +2,208 @@ pico-8 cartridge // http://www.pico-8.com
 version 34
 __lua__
 --[[
-  Experminent with tables adding and removing
 ]]--
+--
+-- 01 Try out drawing the maze sprits
+-- 02 Binary Tree
+-- 03 Sidewinder
+-- 04 Random Sidewider
+-- 05 Dijkstra's Algorithm (fixed maze)
+-- 06 Aldous-Broder
+-- 07 Wilson's
+-- 08 Hunt and kill
+-- 09 Recursive backtrack + try as an object
+--
+-- 0=black  1=dk blue  2=purple   3=dk green
+-- 4=brown  5=dk grey  6=lgrey    7=white
+-- 8=red    9=orange   10=yellow  11=lgreen
+-- 12=lblue 13=mgrey   14=pink    15=peach
+--
+-- sprites
+--  0-15
+-- 16-31 maze n1 e2 s4 w8 if true then draw wall
+-- 32-47 maze n1 e2 s4 w8 if true then draw thin wall
+-- 48-63 numbers 0-15
+-- 64-79 maze n1 e2 s4 w8 if true then draw space
+-- 80-95 color blocks
+--
+--  +- -+- -+  > v   06 14 12 08 01       dn=1
+--  |- -+- -|  < ^   07 15 13 02 04   dw=8  +  de=2
+--  +_ _+_ _+  - |   03 11 09 10 05       ds=4
+-- 
 -- ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 _dn,_de,_ds,_dw=1,2,4,8
-_in,_ie,_is,_iw=1,2,3,4
+_nrow,_ncol=15,15
 sbase=16 -- 16=maze
 -- sbase=48 -- numbers
 -- sbase=80 -- colors
 
 -- control
 _ctrl = {
-  nrow=3,
-  ncol=4,
-  free_run=false,
+  run=false,
   time=0,
-  bump=5,--10,
-  grid=true,
-  start_msg=true,
+  bump=10,
+  grid=false,
+  start_msg=false,
 }
 
-function experiment()
-  function fwd(_x,_y) return _x+(_y*5) end
-  function rev(_v) return _v%5, flr(_v/5) end
-  function fadd(_t,_x,_y) add(_t, fwd(_x,_y)) end
-  function fdel(_t,_v) local r repeat r= del(_t,_v) until r == nil end
-  local t, x, y, z
-  x=2
-  y=3
-  v = fwd(x,y)
-  x,y=rev(v)
-  printh("xyv="..x..','..y..','..v)
-  t = {1, 2, 3, 2, 2, 2}
-  prt_table(t)
-  fadd(t, 2, 3)
-  prt_table(t)
-  v = del(t,3)
-  printh('v='..v)
-  v = del(t,3)
-  printh('v='..tostr(v))
-  prt_table(t)
-  fdel(t,2)
-  prt_table(t)
-end
-
-function experiment_one()
-  function fdel(t,v)
-    local n=#t
-    for i=1,n do
-      if t[i]==v then
-        t[i]=t[n]
-        t[n]=nil
-        return
-      end
-    end
-  end
-  
-  local a
-  a={{1,2},{3,4},{5,6},{7,8}}
-  prt_table(a)
-
-  --del(a, {3,4}) -- does not work
-  --fdel(a, {3,4}) -- does not work
-  --del(a,a[2]) -- this one works
-
-  --local p={3,4} -- does not work
-  --del(a,p)
-
-  local p
-  p = a[3] -- this version works
-  del(a,p)
-  prt_table(a)
-  
-  p={1,2}
-  local t={1,2}
-  printh("p=t is "..tostr(p==t))
-
-  local t={1, 2, 3, 4, 5}
-  prt_table(t)
-  del(t,3)
-  fdel(t,4)
-  prt_table(t)
-end
+_rnd_dir = { -- get random dir vector
+  dirs={{1,2,3,4},{1,2,4,3},{1,3,2,4},{1,3,4,2},{1,4,2,3},{1,4,3,2},
+        {2,1,3,4},{2,1,4,3},{2,3,1,4},{2,3,4,1},{2,4,1,3},{2,4,3,1},
+        {3,1,2,4},{3,1,4,2},{3,2,1,4},{3,2,4,1},{3,4,1,2},{3,4,2,1},
+        {4,1,2,3},{4,1,3,2},{4,2,1,3},{4,2,3,1},{4,3,1,2},{4,3,2,1}},
+  get=function(self) return _rnd_dir.dirs[irand(24)] end,
+}
 
 -- ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
-_algo={ -- 
-  state=nil,
-  dx={0,1,0,-1}, -- dx by dir
-  dy={-1,0,1,0}, -- dy by dir
-  opp={3,4,1,2}, -- opposite direction
-  i2d={_dn,_de,_ds,_dw},
-
+--xxxaayyzz xyxy abab
+_rb = { --recursive backlog
+  cx=-1,
+  cy=-1,
+  off={{0,-1},{1,0},{0,1},{-1,0}}, -- neighbor offsets
+  opp={{0, 1},{-1,0},{0,-1},{ 1,0}}, -- opposite offsets
+  trk={}, -- the track queue
+  back=false,
+  fini=false,
   init=function(self)
+    self.cx=irand0(_ncol)
+    self.cy=irand0(_nrow)
+    self.trk={{cx,cy}}
+    self.back=false
+    self.fini=false
   end,
-  st_step=function(self) -- do one step of the algo
-  end,
-
-  st_fini=function(self) -- done
-  end,
-
-  done=function(self) return self.state==self.st_fini end,
-
-  draw=function(self) -- additional drawing
-  end,
-
-  full_debug=function (self)
-    printh("full debug -----------------------------------")
-    for k,v in pairs(self) do
-      if type(v)!="function" then
-        printh("k="..k.." - "..tostring(v))
-        if type(v)=="table" then prt_table(v) end
+  carve=function(self)
+    local rnay=_rnd_dir.get()
+    local done=false
+    for n in all(rnay) do
+      if not done then
+        newx=self.cx+self.off[n][1]
+        newy=self.cy+self.off[n][2]
+        if valid(newx,newy) and free(newx,newy) then
+          add(self.trk, {newx, newy})
+          carve_to(n,self.cx,self.cy)
+          self.cx=newx
+          self.cy=newy
+          carve_from(n,self.cx,self.cy)
+          done=true
+        end
       end
+    end
+    if not done then -- didn't find a step
+      --printh("switch to back")
+      self.back=true
+    end
+  end,
+  backup=function(self)
+    -- here xxxxyyyxzzzzz
+    while self.back do
+      --pop off stack
+      local newx,newy
+      local pt= self.trk[#self.trk]
+      pt= self.trk[#self.trk]
+      self.trk[#self.trk]=nil
+      local rnay=_rnd_dir.get()
+      for n in all(rnay) do
+        newx=pt[1]+self.off[n][1]
+        newy=pt[2]+self.off[n][2]
+        if valid(newx,newy) and free(newx,newy) then
+          self.cx=pt[1]
+          self.cy=pt[2]
+          carve_to(n,self.cx,self.cy)
+          self.cx=newx
+          self.cy=newy
+          carve_from(n,self.cx,self.cy)
+          self.back=false
+        end
+        if #self.trk == 1 then
+          --printh("We are done")
+          self.back = false
+          self.fini=true
+        end
+      end
+    end
+  end,
+  step=function(self)
+    if self.fini then
+      return
+    else
+      if self.back==true then
+        _rb:backup()
+      else
+        _rb:carve()
+      end
+    end
+  end,
+  dbg=function(self)
+    printh("dbg rb")
+    printh("at ("..self.cx..","..self.cy..")")
+    for k,v in pairs(self.trk) do
+      printh("   "..j.." ("..v[1]..","..v[2]..")")
+    end
+  end,
+  draw=function(self)
+    if valid(self.cx,self.cy) and not self.fini then
+      rect(self.cx*8, self.cy*8, self.cx*8+6,self.cy*8+6,6)
     end
   end,
 }
 
-function prt_table(t,_nlc)
-  -- nlc = number entries before cr
+function prt_table(t, lvl)
   if type(t)!="table" then return end
-  local out="{"
-  local nl=0
-  local k,v
-  local nlc=_nlc or 5
+  local out=lvl.."{"
   for k,v in pairs(t) do
     if type(v) == "table" then
-      if type(v[1]) == "table" then
-        prt_table(v)
-        nl=0
+      if #v == 2 then
+        out=out.."{"..v[1]..","..v[2].."}"
       else
-        out=out..'('..tblstr(v)..') '
-        nl+=1
-        if (nl>=nlc) then out=out..'\n' nl=0 end
+        prt_table(v, lvl)
       end
-    else out=out..tostring(v)..' ' end
+    else
+      out=out..tostring(v)
+    end
   end
   out=out.."}"
   printh(out)
 end
+
+function _rb:full_debug(self)
+  printh("rb full debug -----------------------------------")
+  --printh("at ".._rb.cx)
+  for k,v in pairs(_rb) do
+    printh("k="..k.." - "..tostring(v))
+    if type(v)=="table" then
+      prt_table(v,"+-")
+    end
+  end
+  printh("-------------------------------------------------")
+end
+
 -- ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 function irand(n) return ceil(rnd(n)) end -- rand in [1..n]
 function irand0(n) return ceil(rnd(n))-1 end
-function tblstr(_t)
-  out="" for j=1,#_t-1 do out=out.._t[j].."," end return out.._t[#_t]
+function free(_x,_y) return mget(_x,_y)==sbase end
+function valid(_x,_y) return (0 <= _x) and (_x < _ncol) and (0 <= _y) and (_y<_nrow) end
+function carve_to(_d,_x,_y)
+  local dir={_dn,_de,_ds,_dw}
+  mset(_x,_y,mget(_x,_y)+dir[_d])
 end
-function shuffle(t)
-  for i=#t,1,-1 do
-    local j=flr(rnd(i))+1
-    t[i],t[j] = t[j],t[i]
-  end
+function carve_from(_d,_x,_y)
+  local odr={_ds,_dw,_dn,_de}
+  mset(_x,_y,mget(_x,_y)+odr[_d])
 end
+
+-- ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+
 -- ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 function init_maze()
   on={0, 0}
-  for y=0,_ctrl.nrow-1 do
-    for x=0,_ctrl.ncol-1 do
+  for y=0,_nrow-1 do
+    for x=0,_ncol-1 do
       mset(x,y,0+sbase)
     end
   end
-  _algo:init()
-  experiment()
+  _rb:init()
 end
 
 -- ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
@@ -171,6 +214,7 @@ function _init() --iiiiiii
     local siv,s s=stat(95) if s < 10 then siv=":0" else siv=":" end
     printh (stat(93)..div..m..siv..s.." ---------------------------------------- ")
   end
+
   -- init the map
   init_maze()
 end
@@ -179,53 +223,56 @@ function _update() --uuuuuuuu
 
   if btnp(0) then
     --printh("Btn 0 left")
-    _algo:state()
+    _rb:step()
 
   elseif btnp(1) then
     --printh("Btn 1 right")
-    _ctrl.free_run=not _ctrl.free_run
+    init_maze()
 
   elseif btnp(2) then 
     --printh("Btn 2 up")
-    if _algo:done() then init_maze() end
-    while not _algo:done() do _algo:state() end
+    if _rb.fini then init_maze() end
+    while not _rb.fini do
+      _rb:step()
+    end
 
   elseif btnp(3) then
     --printh("Btn 3 down")
-    init_maze()
+    _ctrl.run= not _ctrl.run
 
   elseif btnp(4) then
     --printh("Btn 4 = cv")
-    _algo:full_debug()
+    --_rb:dbg()
+    _rb:full_debug()
 
   elseif btnp(5) then
     --printh("Btn 5 = nm")
     _ctrl.grid = not _ctrl.grid
   end
 
-  if _ctrl.free_run then
+  if _ctrl.run then
     _ctrl.time += 1
     if _ctrl.time > _ctrl.bump then 
       _ctrl.time = 0
-      if not _algo:done() then _algo:state() end
+      if not _rb.fini then _rb:step() end
     end
   end
 end
 
 function _draw() --dddddd
   cls()
-  mapdraw(0, 0, 0, 0, _ctrl.ncol, _ctrl.nrow)
+  mapdraw(0, 0, 0, 0, _ncol, _nrow)
   if _ctrl.grid then
     fillp(0b1010010110100101.1)
-    for y=1,_ctrl.nrow+1 do
-      for x=1,_ctrl.ncol+1 do
-        line((x-1)*8,0 ,(x-1)*8,_ctrl.nrow*8,6)
+    for y=1,_nrow+1 do
+      for x=1,_ncol+1 do
+        line((x-1)*8,0 ,(x-1)*8,_nrow*8,6)
       end
-      line(0,(y-1)*8,(_ctrl.ncol)*8-1,(y-1)*8,6)
+      line(0,(y-1)*8,(_ncol)*8-1,(y-1)*8,6)
     end
     fillp()
   end
-  _algo:draw()
+  _rb:draw()
 end
 
 __gfx__

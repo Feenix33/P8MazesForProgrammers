@@ -17,3 +17,4 @@
 |m11recstate.p8 | Recursive backtrack w/braiding switch to state mgmt |
 |m12kruskal.p8 | Kruskal's algo |
 |m13prim.p8 | Prims algo w/o weights |
+|m14eller.p8 | Eller's |

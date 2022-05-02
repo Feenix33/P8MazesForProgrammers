@@ -18,3 +18,4 @@
 |m12kruskal.p8 | Kruskal's algo |
 |m13prim.p8 | Prims algo w/o weights |
 |m14eller.p8 | Eller's |
+|m15division.p8 | Recursive division (fractal like) |
